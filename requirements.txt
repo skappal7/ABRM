@@ -3,5 +3,5 @@ scikit-learn
 joblib
 openpyxl
 taipy
-gunicorn
-Flask
+seaborn
+matplotlib
