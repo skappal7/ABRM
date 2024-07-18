@@ -11,7 +11,7 @@ app = Flask(__name__)
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
-gui = Gui(page_name="Agent Burnout Prediction")
+gui = Gui()
 
 # Markdown content for each page
 introduction_md = """
@@ -125,7 +125,7 @@ def train_models_route():
         for model_name in MODEL_NAMES:
             model = joblib.load(f'{model_name}.joblib')
             y_pred = model.predict(X)
-            accuracy = accuracy_score(y, y_pred)
+            accuracy = accuracy_score(y, y_pred)  # Assuming accuracy_score is imported from sklearn.metrics
             report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
             print(f"{model_name} model accuracy: {accuracy}")
             print(report)
