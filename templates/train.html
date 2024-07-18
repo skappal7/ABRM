@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Model Training Complete</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Accuracy</th>
+            <th>Report</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for model_name, report in model_reports.items() %}
+        <tr>
+            <td>{{ model_name }}</td>
+            <td>{{ report['Accuracy'] }}</td>
+            <td><pre>{{ report['Report'] }}</pre></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
