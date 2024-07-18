@@ -1,4 +1,5 @@
 pandas
 scikit-learn
-taipy-gui
-Flask
+flask
+joblib
+gunicorn
