@@ -4,3 +4,4 @@ joblib
 openpyxl
 taipy
 gunicorn
+Flask
