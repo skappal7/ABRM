@@ -1,11 +1,80 @@
-{% extends "base.html" %}
-
-{% block content %}
-<h2>Upload Data</h2>
-<form action="/upload" method="post" enctype="multipart/form-data">
-    <div class="form-group">
-        <input type="file" name="file" class="form-control-file">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Burnout Prediction</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f8f9fa;
+            color: #333333;
+        }
+        header {
+            background-color: #07B1FC;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        footer {
+            background-color: #06516F;
+            padding: 10px;
+            text-align: center;
+            color: white;
+        }
+        .container {
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #06516F;
+        }
+        form {
+            margin-top: 20px;
+        }
+        input[type="file"], input[type="text"], input[type="submit"] {
+            display: block;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        input[type="submit"] {
+            background-color: #07B1FC;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #06516F;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #07B1FC;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="/static/img/logo.png" alt="Organization Logo" height="50">
+        <h1>Agent Burnout Prediction</h1>
+    </header>
+    <div class="container">
+        {% block content %}{% endblock %}
     </div>
-    <input type="submit" value="Upload" class="btn btn-primary">
-</form>
-{% endblock %}
+    <footer>
+        &copy; 2024 Humach
+    </footer>
+</body>
+</html>
