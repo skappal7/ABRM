@@ -1,6 +1,5 @@
 pandas
 scikit-learn
-flask
 joblib
-gunicorn
 openpyxl
+taipy
