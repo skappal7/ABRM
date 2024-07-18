@@ -3,12 +3,15 @@ from taipy import Gui, Config, Core, Scope
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 import base64
-from data_preprocessing import preprocess_data
-from model_training import train_model, predict
 
 # Initial data loading
 data = pd.read_csv("ABRMData.csv")
@@ -17,6 +20,51 @@ data = pd.read_csv("ABRMData.csv")
 selected_model = "Random Forest"
 models = {}
 X_train, X_test, y_train, y_test = None, None, None, None
+
+# Data preprocessing function
+def preprocess_data(data):
+    # Drop unnecessary columns
+    data = data.drop(['RowNumber', 'CustomerId', 'Surname'], axis=1, errors='ignore')
+    
+    # Convert categorical variables to numeric
+    data = pd.get_dummies(data, drop_first=True)
+    
+    # Separate features and target
+    X = data.drop('EXITED', axis=1)
+    y = data['EXITED']
+    
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    return X_scaled, y
+
+# Model training function
+def train_model(X_train, y_train, X_test, y_test, model_type="Random Forest"):
+    models = {
+        'Logistic Regression': LogisticRegression(max_iter=1000),
+        'Decision Tree': DecisionTreeClassifier(),
+        'Random Forest': RandomForestClassifier(),
+        'Gradient Boosting': GradientBoostingClassifier()
+    }
+    
+    if model_type not in models:
+        raise ValueError("Unsupported model type")
+    
+    model = models[model_type]
+    model.fit(X_train, y_train)
+    
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    
+    return model, accuracy, cm
+
+# Prediction function
+def predict(model, input_data):
+    prediction = model.predict(input_data)
+    probability = model.predict_proba(input_data)
+    return prediction, probability
 
 # Utility functions
 def create_chart(df, x_column, y_column, chart_type="scatter"):
@@ -114,7 +162,7 @@ data_viz_md = """
 train_md = """
 # Model Training
 
-<|{selected_model}|selector|label=Select Model|lov=["Random Forest"]|>
+<|{selected_model}|selector|label=Select Model|lov=["Logistic Regression", "Decision Tree", "Random Forest", "Gradient Boosting"]|>
 <|Prepare Data|button|on_action=prepare_data|>
 <|Train Model|button|on_action=train_model_gui|>
 
