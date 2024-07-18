@@ -139,41 +139,84 @@ def make_prediction(state):
     state.prediction_table = state.data.to_html(index=False)
 
 # Taipy pages
-index_md = """
+root_md = """
+<|toggle|theme|>
+
 # Agent Risk Indicator Prediction
 
 Welcome to the Agent Risk Indicator Prediction application. This tool helps predict risk indicators for agents based on various factors.
 
-## Features:
-- Data upload and visualization
-- Model training
-- Risk prediction
+## Navigation
 
-<|Navigate to Data Upload|button|on_action=lambda state: state.navigate("data_upload")|>
+<|layout|columns=1 1 1 1|
+<|card|
+### Data Upload
+<|navigate|data_upload|Upload Data|button|>
+|>
+
+<|card|
+### Data Visualization
+<|navigate|data_visualization|Visualize Data|button|>
+|>
+
+<|card|
+### Model Training
+<|navigate|train|Train Model|button|>
+|>
+
+<|card|
+### Make Predictions
+<|navigate|predict|Predict|button|>
+|>
+|>
 """
 
 data_upload_md = """
-# Data Upload and Visualization
+<|toggle|theme|>
 
+# Data Upload
+
+<|layout|columns=1 1|
+<|card|
+## Upload your CSV file
 <|{file}|file_selector|label=Upload CSV|on_change=on_file_upload|>
+|>
 
+<|card|
+## Data Summary
 <|{data_summary}|raw|>
+|>
+|>
 
+<|navigate|data_visualization|Visualize Data|button|>
+"""
+
+data_viz_md = """
+<|toggle|theme|>
+
+# Data Visualization
+
+<|layout|columns=1 1 1|
 <|{x_column}|selector|label=Select X|lov={data.columns}|on_change=on_change_x|>
 <|{y_column}|selector|label=Select Y|lov={data.columns}|on_change=on_change_y|>
 <|{chart_type}|selector|label=Chart Type|lov=["scatter", "histogram"]|on_change=on_change_chart_type|>
+|>
 
 <|{chart}|image|>
 
-<|Navigate to Model Training|button|on_action=lambda state: state.navigate("train")|>
+<|navigate|train|Train Model|button|>
 """
 
 train_md = """
+<|toggle|theme|>
+
 # Model Training
 
+<|layout|columns=1 1 1|
 <|{selected_model}|selector|label=Select Model|lov=["Logistic Regression", "Decision Tree", "Random Forest", "Gradient Boosting"]|>
 <|Prepare Data|button|on_action=prepare_data|>
 <|Train Model|button|on_action=train_model_gui|>
+|>
 
 <|{data_prep_message}|>
 <|{train_message}|>
@@ -182,10 +225,12 @@ train_md = """
 
 <|{confusion_matrix}|image|>
 
-<|Navigate to Prediction|button|on_action=lambda state: state.navigate("predict")|>
+<|navigate|predict|Make Predictions|button|>
 """
 
 predict_md = """
+<|toggle|theme|>
+
 # Prediction
 
 <|Make Predictions|button|on_action=make_prediction|>
@@ -198,16 +243,14 @@ predict_md = """
 
 <|Download Results|button|on_action=lambda state: state.data.to_csv("predictions.csv")|>
 
-<|Navigate to Home|button|on_action=lambda state: state.navigate("/")|>
+<|navigate|/|Back to Home|button|>
 """
 
 # Taipy app configuration
-config = Config()
-
-# Define the pages
 pages = {
-    "/": index_md,
+    "/": root_md,
     "data_upload": data_upload_md,
+    "data_visualization": data_viz_md,
     "train": train_md,
     "predict": predict_md,
 }
