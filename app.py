@@ -11,6 +11,7 @@ app = Flask(__name__)
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
+# Initialize Gui with required parameters or configurations if any
 gui = Gui()
 
 # Markdown content for each page
@@ -73,31 +74,31 @@ View and download predictions and probabilities.
 
 @app.route('/')
 def index():
-    return gui.show(page_content=Markdown(introduction_md))
+    return gui.render(Markdown(introduction_md))
 
 @app.route('/visualization')
 def visualization():
-    return gui.show(page_content=Markdown(visualization_md))
+    return gui.render(Markdown(visualization_md))
 
 @app.route('/upload')
 def upload():
-    return gui.show(page_content=Markdown(upload_md))
+    return gui.render(Markdown(upload_md))
 
 @app.route('/prepare')
 def prepare():
-    return gui.show(page_content=Markdown(preparation_md))
+    return gui.render(Markdown(preparation_md))
 
 @app.route('/train')
 def train():
-    return gui.show(page_content=Markdown(training_md))
+    return gui.render(Markdown(training_md))
 
 @app.route('/predict')
 def predict():
-    return gui.show(page_content=Markdown(prediction_md))
+    return gui.render(Markdown(prediction_md))
 
 @app.route('/database')
 def database():
-    return gui.show(page_content=Markdown(database_md))
+    return gui.render(Markdown(database_md))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
