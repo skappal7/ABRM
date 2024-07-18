@@ -170,8 +170,10 @@ initial_state = {
     "prediction_probability": "",
 }
 
-# Create and run the Gui
+# Create the Gui object
 gui = Gui(pages=pages)
 
 if __name__ == "__main__":
-    gui.run(use_reloader=True, state=initial_state)
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    gui.run(host="0.0.0.0", port=port)
