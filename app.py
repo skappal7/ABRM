@@ -15,7 +15,7 @@ gui = Gui()
 def index():
     return """
     <h1>Agent Burnout Prediction</h1>
-    <form action="/upload" method="post" enctype="multipart/form-data">
+    <form action="upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file">
         <input type="submit" value="Upload">
     </form>
@@ -24,7 +24,7 @@ def index():
 def upload_file():
     file = gui.request.files['file']
     file.save(FILE_PATH)
-    return gui.redirect('/train')
+    return gui.redirect('train')
 
 def train():
     X, y, scaler = preprocess_data(FILE_PATH)
@@ -81,7 +81,7 @@ def predict():
     else:
         return """
         <h2>Enter Agent Data for Prediction</h2>
-        <form action="/predict" method="post">
+        <form action="predict" method="post">
             <label for="aht">Average of AHT (seconds):</label>
             <input type="text" id="aht" name="Average of AHT (seconds)"><br><br>
             <label for="attendance">Average of Attendance:</label>
@@ -94,12 +94,12 @@ def predict():
         </form>
         """
 
-# Binding the functions to the GUI
+# Binding the functions to the GUI without leading forward slash
 pages = {
-    "/": index,
-    "/upload": upload_file,
-    "/train": train,
-    "/predict": predict
+    "index": index,
+    "upload": upload_file,
+    "train": train,
+    "predict": predict
 }
 
 for route, page in pages.items():
