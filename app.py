@@ -9,10 +9,9 @@ from taipy.gui import Gui
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
-# Define the GUI
+# Initialize the GUI
 gui = Gui()
 
-@gui.page("/")
 def index():
     return """
     <h1>Agent Burnout Prediction</h1>
@@ -22,13 +21,11 @@ def index():
     </form>
     """
 
-@gui.page("/upload", methods=['POST'])
 def upload_file():
     file = gui.request.files['file']
     file.save(FILE_PATH)
     return gui.redirect('/train')
 
-@gui.page("/train")
 def train():
     X, y, scaler = preprocess_data(FILE_PATH)
     models = train_models(X, y)
@@ -56,7 +53,6 @@ def train():
     </table>
     """
 
-@gui.page("/predict", methods=['GET', 'POST'])
 def predict():
     if gui.request.method == 'POST':
         input_data = gui.request.form.to_dict()
@@ -97,6 +93,17 @@ def predict():
             <input type="submit" value="Predict">
         </form>
         """
+
+# Binding the functions to the GUI
+pages = {
+    "/": index,
+    "/upload": upload_file,
+    "/train": train,
+    "/predict": predict
+}
+
+for route, page in pages.items():
+    gui.add_page(route, page)
 
 if __name__ == '__main__':
     gui.run()
