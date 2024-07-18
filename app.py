@@ -1,164 +1,177 @@
-import os
+import taipy as tp
+from taipy import Gui, Config, Core, Scope
 import pandas as pd
-import joblib
-from flask import Flask, request, redirect
+import numpy as np
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
 from data_preprocessing import preprocess_data
-from model_training import train_models
-from taipy.gui import Gui, Markdown
+from model_training import train_model, predict
 
-app = Flask(__name__)
+# Initial data loading
+data = pd.read_csv("ABRMData.csv")
 
-FILE_PATH = 'ABRMData.csv'
-MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
+# Global variables
+selected_model = "Random Forest"
+models = {}
+X_train, X_test, y_train, y_test = None, None, None, None
 
-# Initialize Gui with required parameters or configurations if any
-gui = Gui()
+# Utility functions
+def create_chart(df, x_column, y_column, chart_type="scatter"):
+    plt.figure(figsize=(10, 6))
+    if chart_type == "scatter":
+        sns.scatterplot(data=df, x=x_column, y=y_column, hue="EXITED")
+    elif chart_type == "histogram":
+        sns.histplot(data=df, x=x_column, hue="EXITED", kde=True)
+    plt.title(f"{chart_type.capitalize()} plot of {x_column} vs {y_column}")
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
 
-# Markdown content for each page
-introduction_md = """
-# Agent Burnout Prediction
+# Page content and functions
+def on_change_x(state):
+    state.chart = create_chart(state.data, state.x_column, state.y_column, state.chart_type)
 
-Burnout risk is a significant issue in workplaces. This application helps predict the risk of burnout for agents based on historical data and various metrics.
+def on_change_y(state):
+    state.chart = create_chart(state.data, state.x_column, state.y_column, state.chart_type)
+
+def on_change_chart_type(state):
+    state.chart = create_chart(state.data, state.x_column, state.y_column, state.chart_type)
+
+def prepare_data(state):
+    global X_train, X_test, y_train, y_test
+    X, y = preprocess_data(state.data)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    state.data_prep_message = "Data prepared for model training."
+
+def train_model_gui(state):
+    global models, X_train, X_test, y_train, y_test
+    if X_train is None:
+        state.train_message = "Please prepare the data first."
+        return
+    
+    model, accuracy, cm = train_model(X_train, y_train, X_test, y_test, model_type=state.selected_model)
+    models[state.selected_model] = model
+    
+    plt.figure(figsize=(10,7))
+    sns.heatmap(cm, annot=True, fmt='d')
+    plt.title('Confusion Matrix')
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    state.confusion_matrix = base64.b64encode(buf.getvalue()).decode('utf-8')
+    
+    state.train_message = f"Model trained. Accuracy: {accuracy:.2f}"
+
+def make_prediction(state):
+    if not models:
+        state.prediction_result = "Please train a model first."
+        return
+    
+    input_data = pd.DataFrame({
+        'CREDITSCORE': [state.creditscore],
+        'TENURE': [state.tenure],
+        # Add other features here
+    })
+    
+    model = models[state.selected_model]
+    prediction, probability = predict(model, input_data)
+    
+    state.prediction_result = f"Prediction: {'High' if prediction[0] == 1 else 'Low'} burnout risk"
+    state.prediction_probability = f"Probability: {probability[0][1]:.2f}"
+
+# Taipy pages
+index_md = """
+# Agent Burnout Risk Prediction
+
+Welcome to the Agent Burnout Risk Prediction application. This tool helps identify agents at risk of burnout using machine learning techniques.
+
+## Features:
+- Data visualization
+- Model training
+- Burnout risk prediction
+
+<|Navigate to Data Visualization|button|on_action=lambda state: state.navigate("data_visualization")|>
 """
 
-visualization_md = """
-## Data Visualization
+data_viz_md = """
+# Data Visualization
 
-Visualize the dataset with scatter plots and histograms.
+<|{x_column}|selector|label=Select X|lov={data.columns}|on_change=on_change_x|>
+<|{y_column}|selector|label=Select Y|lov={data.columns}|on_change=on_change_y|>
+<|{chart_type}|selector|label=Chart Type|lov=["scatter", "histogram"]|on_change=on_change_chart_type|>
+
+<|{chart}|image|>
+
+<|Navigate to Model Training|button|on_action=lambda state: state.navigate("train")|>
 """
 
-upload_md = """
-## Data Upload
+train_md = """
+# Model Training
 
-Upload your dataset here.
-<form action="/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file">
-    <input type="submit" value="Upload">
-</form>
+<|{selected_model}|selector|label=Select Model|lov=["Random Forest"]|>
+<|Prepare Data|button|on_action=prepare_data|>
+<|Train Model|button|on_action=train_model_gui|>
+
+<|{data_prep_message}|>
+<|{train_message}|>
+
+## Confusion Matrix
+
+<|{confusion_matrix}|image|>
+
+<|Navigate to Prediction|button|on_action=lambda state: state.navigate("predict")|>
 """
 
-preparation_md = """
-## Data Preparation
+predict_md = """
+# Prediction
 
-Preprocess and prepare your data for model training.
+<|{creditscore}|number|label=Credit Score|>
+<|{tenure}|number|label=Tenure|>
+# Add other input fields here
+
+<|Make Prediction|button|on_action=make_prediction|>
+
+<|{prediction_result}|>
+<|{prediction_probability}|>
+
+<|Navigate to Home|button|on_action=lambda state: state.navigate("/")|>
 """
 
-training_md = """
-## Model Training
+# Taipy app configuration
+config = Config()
 
-Train machine learning models and evaluate their performance.
-"""
+# Define the pages
+pages = {
+    "/": index_md,
+    "data_visualization": data_viz_md,
+    "train": train_md,
+    "predict": predict_md,
+}
 
-prediction_md = """
-## Prediction
+# Initial state
+initial_state = {
+    "data": data,
+    "x_column": data.columns[0],
+    "y_column": data.columns[1],
+    "chart_type": "scatter",
+    "chart": create_chart(data, data.columns[0], data.columns[1]),
+    "selected_model": "Random Forest",
+    "creditscore": 700,
+    "tenure": 5,
+    "data_prep_message": "",
+    "train_message": "",
+    "prediction_result": "",
+    "prediction_probability": "",
+}
 
-Input new data to predict burnout risk.
-<form action="/predict" method="post">
-    <label for="aht">Average of AHT (seconds):</label>
-    <input type="text" id="aht" name="Average of AHT (seconds)"><br><br>
-    <label for="attendance">Average of Attendance:</label>
-    <input type="text" id="attendance" name="Average of Attendance"><br><br>
-    <label for="csat">Average of CSAT (%):</label>
-    <input type="text" id="csat" name="Average of CSAT (%)"><br><br>
-    <label for="attrition">Attrition Flag:</label>
-    <input type="text" id="attrition" name="Attrition Flag"><br><br>
-    <input type="submit" value="Predict">
-</form>
-"""
+# Create and run the Gui
+gui = Gui(pages=pages)
 
-database_md = """
-## Database
-
-View and download predictions and probabilities.
-"""
-
-@app.route('/')
-def index():
-    return gui.render(Markdown(introduction_md))
-
-@app.route('/visualization')
-def visualization():
-    return gui.render(Markdown(visualization_md))
-
-@app.route('/upload')
-def upload():
-    return gui.render(Markdown(upload_md))
-
-@app.route('/prepare')
-def prepare():
-    return gui.render(Markdown(preparation_md))
-
-@app.route('/train')
-def train():
-    return gui.render(Markdown(training_md))
-
-@app.route('/predict')
-def predict():
-    return gui.render(Markdown(prediction_md))
-
-@app.route('/database')
-def database():
-    return gui.render(Markdown(database_md))
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    file = request.files['file']
-    file.save(FILE_PATH)
-    print(f"File saved to {FILE_PATH}")
-    return redirect('/prepare')
-
-@app.route('/prepare', methods=['POST'])
-def prepare_data():
-    try:
-        X, y, scaler = preprocess_data(FILE_PATH)
-        joblib.dump(scaler, 'scaler.joblib')
-        print("Data prepared successfully.")
-        return redirect('/train')
-    except Exception as e:
-        print(f"Error during data preparation: {e}")
-        return f"Error: {e}"
-
-@app.route('/train', methods=['POST'])
-def train_models_route():
-    try:
-        X, y, scaler = preprocess_data(FILE_PATH)
-        models = train_models(X, y)
-        for model_name in MODEL_NAMES:
-            model = joblib.load(f'{model_name}.joblib')
-            y_pred = model.predict(X)
-            accuracy = accuracy_score(y, y_pred)  # Assuming accuracy_score is imported from sklearn.metrics
-            report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
-            print(f"{model_name} model accuracy: {accuracy}")
-            print(report)
-        return redirect('/database')
-    except Exception as e:
-        print(f"Error during model training: {e}")
-        return f"Error: {e}"
-
-@app.route('/predict', methods=['POST'])
-def predict_route():
-    input_data = request.form.to_dict()
-    input_df = pd.DataFrame([input_data])
-    scaler = joblib.load('scaler.joblib')
-    input_scaled = scaler.transform(input_df)
-    predictions = {}
-    for model_name in MODEL_NAMES:
-        model = joblib.load(f'{model_name}.joblib')
-        prediction = model.predict(input_scaled)[0]
-        predictions[model_name] = ['Low Risk', 'Medium Risk', 'High Risk'][prediction]
-    table_rows = "".join([f"<tr><td>{model_name}</td><td>{predictions[model_name]}</td></tr>" for model_name in MODEL_NAMES])
-    return f"""
-    <h2>Predictions</h2>
-    <table>
-        <tr>
-            <th>Model</th>
-            <th>Prediction</th>
-        </tr>
-        {table_rows}
-    </table>
-    <a href="/">Go Back</a>
-    """
-
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    gui.run(use_reloader=True, state=initial_state)
