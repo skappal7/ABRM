@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, classification_report
 
 app = Flask(__name__)
 
-FILE_PATH = 'ABRMData.csv'
+FILE_PATH = 'ABRMData.xlsx'  # Change this to .csv if your file is in CSV format
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
 @app.route('/')
@@ -31,7 +31,12 @@ def upload_file():
 @app.route('/train')
 def train():
     try:
-        X, y, scaler = preprocess_data(FILE_PATH)
+        # Specify the engine explicitly for Excel files
+        if FILE_PATH.endswith('.xlsx'):
+            X, y, scaler = preprocess_data(FILE_PATH, engine='openpyxl')
+        else:
+            X, y, scaler = preprocess_data(FILE_PATH)
+        
         models = train_models(X, y)
         
         joblib.dump(scaler, 'scaler.joblib')
