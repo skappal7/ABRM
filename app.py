@@ -30,7 +30,7 @@ initial_state = {
 }
 
 # Create the Gui object
-gui = Gui(pages={"": root_md})
+gui = Gui(pages={"/": root_md})  # Changed from "" to "/"
 
 if __name__ == "__main__":
     logger.debug("Starting Taipy app")
