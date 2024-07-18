@@ -1,14 +1,13 @@
+import os
 import pandas as pd
 import joblib
-from flask import Flask, request, redirect, render_template_string
+from flask import Flask, request, redirect
 from data_preprocessing import preprocess_data
 from model_training import train_models
 from sklearn.metrics import accuracy_score, classification_report
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Define file paths and model names
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
@@ -26,36 +25,40 @@ def index():
 def upload_file():
     file = request.files['file']
     file.save(FILE_PATH)
+    print(f"File saved to {FILE_PATH}")
     return redirect('/train')
 
 @app.route('/train')
 def train():
-    X, y, scaler = preprocess_data(FILE_PATH)
-    models = train_models(X, y)
-    
-    # Save the scaler
-    joblib.dump(scaler, 'scaler.joblib')
-    
-    model_reports = {}
-    for model_name in MODEL_NAMES:
-        model = joblib.load(f'{model_name}.joblib')
-        y_pred = model.predict(X)
-        accuracy = accuracy_score(y, y_pred)
-        report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
-        model_reports[model_name] = {'Accuracy': accuracy, 'Report': report}
-
-    table_rows = "".join([f"<tr><td>{model_name}</td><td>{model_reports[model_name]['Accuracy']}</td><td><pre>{model_reports[model_name]['Report']}</pre></td></tr>" for model_name in MODEL_NAMES])
-    return f"""
-    <h2>Model Training Complete</h2>
-    <table>
-        <tr>
-            <th>Model</th>
-            <th>Accuracy</th>
-            <th>Report</th>
-        </tr>
-        {table_rows}
-    </table>
-    """
+    try:
+        X, y, scaler = preprocess_data(FILE_PATH)
+        models = train_models(X, y)
+        
+        joblib.dump(scaler, 'scaler.joblib')
+        
+        model_reports = {}
+        for model_name in MODEL_NAMES:
+            model = joblib.load(f'{model_name}.joblib')
+            y_pred = model.predict(X)
+            accuracy = accuracy_score(y, y_pred)
+            report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
+            model_reports[model_name] = {'Accuracy': accuracy, 'Report': report}
+        
+        table_rows = "".join([f"<tr><td>{model_name}</td><td>{model_reports[model_name]['Accuracy']}</td><td><pre>{model_reports[model_name]['Report']}</pre></td></tr>" for model_name in MODEL_NAMES])
+        return f"""
+        <h2>Model Training Complete</h2>
+        <table>
+            <tr>
+                <th>Model</th>
+                <th>Accuracy</th>
+                <th>Report</th>
+            </tr>
+            {table_rows}
+        </table>
+        """
+    except Exception as e:
+        print(f"Error during training: {e}")
+        return f"Error: {e}"
 
 @app.route('/predict', methods=['GET', 'POST'])
 def predict():
@@ -63,7 +66,6 @@ def predict():
         input_data = request.form.to_dict()
         input_df = pd.DataFrame([input_data])
 
-        # Load the scaler and models
         scaler = joblib.load('scaler.joblib')
         input_scaled = scaler.transform(input_df)
 
@@ -101,4 +103,5 @@ def predict():
         """
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
