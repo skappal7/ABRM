@@ -13,25 +13,23 @@ import seaborn as sns
 import io
 import base64
 
-# Initial data loading
-data = pd.read_csv("ABRMData.csv")
-
 # Global variables
+data = pd.DataFrame()
 selected_model = "Random Forest"
 models = {}
 X_train, X_test, y_train, y_test = None, None, None, None
 
 # Data preprocessing function
 def preprocess_data(data):
-    # Drop unnecessary columns
-    data = data.drop(['RowNumber', 'CustomerId', 'Surname'], axis=1, errors='ignore')
+    # Drop 'Agent ID' and 'Attrition Flag' columns
+    data = data.drop(['Agent ID', 'Attrition Flag'], axis=1, errors='ignore')
     
-    # Convert categorical variables to numeric
+    # Convert categorical variables to numeric if any
     data = pd.get_dummies(data, drop_first=True)
     
     # Separate features and target
-    X = data.drop('EXITED', axis=1)
-    y = data['EXITED']
+    X = data.drop('Risk Indicator', axis=1)
+    y = data['Risk Indicator']
     
     # Scale features
     scaler = StandardScaler()
@@ -70,9 +68,9 @@ def predict(model, input_data):
 def create_chart(df, x_column, y_column, chart_type="scatter"):
     plt.figure(figsize=(10, 6))
     if chart_type == "scatter":
-        sns.scatterplot(data=df, x=x_column, y=y_column, hue="EXITED")
+        sns.scatterplot(data=df, x=x_column, y=y_column, hue="Risk Indicator")
     elif chart_type == "histogram":
-        sns.histplot(data=df, x=x_column, hue="EXITED", kde=True)
+        sns.histplot(data=df, x=x_column, hue="Risk Indicator", kde=True)
     plt.title(f"{chart_type.capitalize()} plot of {x_column} vs {y_column}")
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
@@ -88,6 +86,15 @@ def on_change_y(state):
 
 def on_change_chart_type(state):
     state.chart = create_chart(state.data, state.x_column, state.y_column, state.chart_type)
+
+def on_file_upload(state, file):
+    if file:
+        state.data = pd.read_csv(file)
+        state.data_summary = state.data.describe().to_html()
+        state.x_column = state.data.columns[1]  # Skip 'Agent ID'
+        state.y_column = state.data.columns[2]
+        state.chart = create_chart(state.data, state.x_column, state.y_column, state.chart_type)
+        return state.data_summary
 
 def prepare_data(state):
     global X_train, X_test, y_train, y_test
@@ -117,38 +124,40 @@ def train_model_gui(state):
     state.train_message = f"Model trained. Accuracy: {accuracy:.2f}"
 
 def make_prediction(state):
-    if not models:
-        state.prediction_result = "Please train a model first."
+    if not models or state.data.empty:
+        state.prediction_result = "Please upload data and train a model first."
         return
     
-    input_data = pd.DataFrame({
-        'CREDITSCORE': [state.creditscore],
-        'TENURE': [state.tenure],
-        # Add other features here
-    })
-    
     model = models[state.selected_model]
-    prediction, probability = predict(model, input_data)
+    X, _ = preprocess_data(state.data)
+    predictions, probabilities = predict(model, X)
     
-    state.prediction_result = f"Prediction: {'High' if prediction[0] == 1 else 'Low'} burnout risk"
-    state.prediction_probability = f"Probability: {probability[0][1]:.2f}"
+    state.data['Predicted Risk'] = predictions
+    state.data['Risk Probability'] = probabilities[:, 1]  # Assuming binary classification
+    
+    state.prediction_result = "Predictions made. You can now download the results."
+    state.prediction_table = state.data.to_html(index=False)
 
 # Taipy pages
 index_md = """
-# Agent Burnout Risk Prediction
+# Agent Risk Indicator Prediction
 
-Welcome to the Agent Burnout Risk Prediction application. This tool helps identify agents at risk of burnout using machine learning techniques.
+Welcome to the Agent Risk Indicator Prediction application. This tool helps predict risk indicators for agents based on various factors.
 
 ## Features:
-- Data visualization
+- Data upload and visualization
 - Model training
-- Burnout risk prediction
+- Risk prediction
 
-<|Navigate to Data Visualization|button|on_action=lambda state: state.navigate("data_visualization")|>
+<|Navigate to Data Upload|button|on_action=lambda state: state.navigate("data_upload")|>
 """
 
-data_viz_md = """
-# Data Visualization
+data_upload_md = """
+# Data Upload and Visualization
+
+<|{file}|file_selector|label=Upload CSV|on_change=on_file_upload|>
+
+<|{data_summary}|raw|>
 
 <|{x_column}|selector|label=Select X|lov={data.columns}|on_change=on_change_x|>
 <|{y_column}|selector|label=Select Y|lov={data.columns}|on_change=on_change_y|>
@@ -179,14 +188,15 @@ train_md = """
 predict_md = """
 # Prediction
 
-<|{creditscore}|number|label=Credit Score|>
-<|{tenure}|number|label=Tenure|>
-# Add other input fields here
-
-<|Make Prediction|button|on_action=make_prediction|>
+<|Make Predictions|button|on_action=make_prediction|>
 
 <|{prediction_result}|>
-<|{prediction_probability}|>
+
+## Prediction Results
+
+<|{prediction_table}|raw|>
+
+<|Download Results|button|on_action=lambda state: state.data.to_csv("predictions.csv")|>
 
 <|Navigate to Home|button|on_action=lambda state: state.navigate("/")|>
 """
@@ -197,7 +207,7 @@ config = Config()
 # Define the pages
 pages = {
     "/": index_md,
-    "data_visualization": data_viz_md,
+    "data_upload": data_upload_md,
     "train": train_md,
     "predict": predict_md,
 }
@@ -205,17 +215,17 @@ pages = {
 # Initial state
 initial_state = {
     "data": data,
-    "x_column": data.columns[0],
-    "y_column": data.columns[1],
+    "x_column": "",
+    "y_column": "",
     "chart_type": "scatter",
-    "chart": create_chart(data, data.columns[0], data.columns[1]),
+    "chart": "",
     "selected_model": "Random Forest",
-    "creditscore": 700,
-    "tenure": 5,
+    "data_summary": "",
     "data_prep_message": "",
     "train_message": "",
     "prediction_result": "",
-    "prediction_probability": "",
+    "prediction_table": "",
+    "confusion_matrix": "",
 }
 
 # Create the Gui object
