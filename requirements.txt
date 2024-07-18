@@ -1,4 +1,4 @@
 pandas
 scikit-learn
-taipy
+taipy-gui
 Flask
