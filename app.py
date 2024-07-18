@@ -1,31 +1,34 @@
 import pandas as pd
 import joblib
+from flask import Flask, request, redirect, render_template_string
 from data_preprocessing import preprocess_data
 from model_training import train_models
 from sklearn.metrics import accuracy_score, classification_report
-from taipy.gui import Gui
+
+# Initialize Flask app
+app = Flask(__name__)
 
 # Define file paths and model names
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
-# Initialize the GUI
-gui = Gui()
-
+@app.route('/')
 def index():
     return """
     <h1>Agent Burnout Prediction</h1>
-    <form action="upload" method="post" enctype="multipart/form-data">
+    <form action="/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file">
         <input type="submit" value="Upload">
     </form>
     """
 
+@app.route('/upload', methods=['POST'])
 def upload_file():
-    file = gui.request.files['file']
+    file = request.files['file']
     file.save(FILE_PATH)
-    return gui.redirect('train')
+    return redirect('/train')
 
+@app.route('/train')
 def train():
     X, y, scaler = preprocess_data(FILE_PATH)
     models = train_models(X, y)
@@ -41,6 +44,7 @@ def train():
         report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
         model_reports[model_name] = {'Accuracy': accuracy, 'Report': report}
 
+    table_rows = "".join([f"<tr><td>{model_name}</td><td>{model_reports[model_name]['Accuracy']}</td><td><pre>{model_reports[model_name]['Report']}</pre></td></tr>" for model_name in MODEL_NAMES])
     return f"""
     <h2>Model Training Complete</h2>
     <table>
@@ -49,13 +53,14 @@ def train():
             <th>Accuracy</th>
             <th>Report</th>
         </tr>
-        {" ".join([f"<tr><td>{model_name}</td><td>{model_reports[model_name]['Accuracy']}</td><td><pre>{model_reports[model_name]['Report']}</pre></td></tr>" for model_name in MODEL_NAMES])}
+        {table_rows}
     </table>
     """
 
+@app.route('/predict', methods=['GET', 'POST'])
 def predict():
-    if gui.request.method == 'POST':
-        input_data = gui.request.form.to_dict()
+    if request.method == 'POST':
+        input_data = request.form.to_dict()
         input_df = pd.DataFrame([input_data])
 
         # Load the scaler and models
@@ -68,6 +73,7 @@ def predict():
             prediction = model.predict(input_scaled)[0]
             predictions[model_name] = ['Low Risk', 'Medium Risk', 'High Risk'][prediction]
 
+        table_rows = "".join([f"<tr><td>{model_name}</td><td>{predictions[model_name]}</td></tr>" for model_name in MODEL_NAMES])
         return f"""
         <h2>Predictions</h2>
         <table>
@@ -75,13 +81,13 @@ def predict():
                 <th>Model</th>
                 <th>Prediction</th>
             </tr>
-            {" ".join([f"<tr><td>{model_name}</td><td>{predictions[model_name]}</td></tr>" for model_name in MODEL_NAMES])}
+            {table_rows}
         </table>
         """
     else:
         return """
         <h2>Enter Agent Data for Prediction</h2>
-        <form action="predict" method="post">
+        <form action="/predict" method="post">
             <label for="aht">Average of AHT (seconds):</label>
             <input type="text" id="aht" name="Average of AHT (seconds)"><br><br>
             <label for="attendance">Average of Attendance:</label>
@@ -94,16 +100,5 @@ def predict():
         </form>
         """
 
-# Binding the functions to the GUI without leading forward slash
-pages = {
-    "index": index,
-    "upload": upload_file,
-    "train": train,
-    "predict": predict
-}
-
-for route, page in pages.items():
-    gui.add_page(route, page)
-
 if __name__ == '__main__':
-    gui.run()
+    app.run(host='0.0.0.0', port=5000)
