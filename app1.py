@@ -347,8 +347,37 @@ def predictions_page():
                     label="Download predictions as CSV",
                     data=csv,
                     file_name="predictions.csv",
+                    st.download_button(
+                    label="Download predictions as CSV",
+                    data=csv,
+                    file_name="predictions.csv",
                     mime="text/csv",
                 )
 
 def main():
     # Add logo
+    logo = load_image_from_url(logo_url)
+    st.sidebar.image(logo, width=200)
+
+    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+        login()
+    else:
+        st.title("Agent Burnout Risk Classification App")
+
+        st.write("""
+        This app predicts the burnout risk for agents based on various features.
+        Upload your data, train the model, and make predictions!
+        """)
+
+        st.sidebar.title("Navigation")
+        page = st.sidebar.radio("Go to", ["Data Upload", "Model Training", "Predictions"])
+
+        if page == "Data Upload":
+            data_upload_page()
+        elif page == "Model Training":
+            model_training_page()
+        elif page == "Predictions":
+            predictions_page()
+
+if __name__ == "__main__":
+    main()
