@@ -2,14 +2,60 @@ import os
 import pandas as pd
 import joblib
 import streamlit as st
-from data_preprocessing import preprocess_data
-from model_training import train_models
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
-# Streamlit app
+def preprocess_data(file_path):
+    data = pd.read_csv(file_path)
+    
+    # Convert necessary columns to numeric types
+    data['Average of AHT (seconds)'] = pd.to_numeric(data['Average of AHT (seconds)'], errors='coerce')
+    data['Average of Attendance'] = pd.to_numeric(data['Average of Attendance'], errors='coerce')
+    data['Average of CSAT (%)'] = pd.to_numeric(data['Average of CSAT (%)'], errors='coerce')
+    data['Attrition Flag'] = pd.to_numeric(data['Attrition Flag'], errors='coerce')
+    
+    data.fillna(data.mean(), inplace=True)
+    
+    # Convert 'Risk Indicator' to categorical
+    data['Risk Indicator'] = data['Risk Indicator'].astype('category')
+    
+    # One-hot encode the 'Risk Indicator' column
+    encoder = OneHotEncoder()
+    risk_indicator_encoded = encoder.fit_transform(data[['Risk Indicator']]).toarray()
+    risk_indicator_df = pd.DataFrame(risk_indicator_encoded, columns=encoder.get_feature_names_out(['Risk Indicator']))
+    
+    # Concatenate the one-hot encoded columns back to the original dataframe
+    data = pd.concat([data, risk_indicator_df], axis=1)
+    
+    # Drop the original 'Risk Indicator' and any other non-feature columns
+    X = data.drop(columns=['Agent ID', 'Risk Indicator'])
+    y = data['Risk Indicator']
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    return X_scaled, y, scaler
+
+def train_models(X, y):
+    models = {
+        'Logistic Regression': LogisticRegression(),
+        'Decision Tree': DecisionTreeClassifier(),
+        'Random Forest': RandomForestClassifier(),
+        'Gradient Boosting': GradientBoostingClassifier()
+    }
+    
+    for model_name, model in models.items():
+        model.fit(X, y)
+        joblib.dump(model, f'{model_name}.joblib')
+
+    return models
+
 def main():
     st.title("Agent Burnout Prediction")
     
