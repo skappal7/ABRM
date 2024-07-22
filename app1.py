@@ -29,14 +29,18 @@ def rounded_rectangle(color, text, value):
     return f"""
     <div style="
         background-color: {color};
-        padding: 20px;
+        padding: 15px;
         border-radius: 10px;
         box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
         margin: 10px;
         text-align: center;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     ">
-        <h3 style="color: white;">{text}</h3>
-        <h2 style="color: white;">{value}</h2>
+        <h4 style="color: white; margin: 0; font-size: 16px;">{text}</h4>
+        <p style="color: white; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{value}</p>
     </div>
     """
 
@@ -169,7 +173,7 @@ def visualize_data(df):
     # Key Metrics
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        st.markdown(rounded_rectangle("#1f77b4", "Agents Count", len(df['Agent ID'].unique())), unsafe_allow_html=True)
+        st.markdown(rounded_rectangle("#1f77b4", "Agents Count", f"{len(df['Agent ID'].unique()):,}"), unsafe_allow_html=True)
     with col2:
         risk_percentages = df['Risk Indicator'].value_counts(normalize=True) * 100
         st.markdown(rounded_rectangle("#ff7f0e", "High Risk %", f"{risk_percentages.get('High Risk', 0):.1f}%"), unsafe_allow_html=True)
