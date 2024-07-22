@@ -24,12 +24,12 @@ def load_data(file):
         return None
 
 def preprocess_data(df):
-    if 'burnout_risk' not in df.columns:
-        st.error("The dataset must contain a 'burnout_risk' column.")
+    if 'Risk Indicator' not in df.columns:
+        st.error("The dataset must contain a 'Risk Indicator' column.")
         return None, None
 
-    X = df.drop('burnout_risk', axis=1)
-    y = df['burnout_risk']
+    X = df.drop(['Risk Indicator', 'Agent ID', 'Attrition Flag'], axis=1)
+    y = df['Risk Indicator']
     X = pd.get_dummies(X)
 
     return X, y
@@ -44,23 +44,30 @@ def train_model(X, y):
 
 def evaluate_model(model, X_test, y_test):
     y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
+    y_prob = model.predict_proba(X_test)
 
     # Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
     plt.title('Confusion Matrix')
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
     st.pyplot(plt)
 
-    # ROC Curve
-    fpr, tpr, _ = roc_curve(y_test, y_prob)
-    roc_auc = auc(fpr, tpr)
+    # ROC Curve (for multi-class, we'll use one-vs-rest)
+    n_classes = len(model.classes_)
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test == model.classes_[i], y_prob[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.figure(figsize=(10, 8))
+    for i in range(n_classes):
+        plt.plot(fpr[i], tpr[i], lw=2,
+                 label=f'ROC curve (AUC = {roc_auc[i]:.2f}) for {model.classes_[i]}')
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -76,7 +83,7 @@ def evaluate_model(model, X_test, y_test):
         'importance': model.feature_importances_
     }).sort_values('importance', ascending=False)
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 8))
     sns.barplot(x='importance', y='feature', data=feature_importance.head(10))
     plt.title('Top 10 Feature Importances')
     plt.xlabel('Importance')
@@ -87,26 +94,25 @@ def visualize_data(df):
     st.subheader("Data Visualization")
 
     # Correlation heatmap
-    corr = df.corr()
+    corr = df.drop(['Agent ID', 'Risk Indicator'], axis=1).corr()
     plt.figure(figsize=(12, 10))
     sns.heatmap(corr, annot=True, cmap='coolwarm', linewidths=0.5)
     plt.title('Correlation Heatmap')
     st.pyplot(plt)
 
     # Distribution of target variable
-    plt.figure(figsize=(8, 6))
-    sns.countplot(x='burnout_risk', data=df)
-    plt.title('Distribution of Burnout Risk')
+    plt.figure(figsize=(10, 6))
+    sns.countplot(x='Risk Indicator', data=df)
+    plt.title('Distribution of Risk Indicator')
     st.pyplot(plt)
 
     # Feature distributions
-    num_cols = df.select_dtypes(include=[np.number]).columns
+    num_cols = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)']
     for col in num_cols:
-        if col != 'burnout_risk':
-            plt.figure(figsize=(8, 6))
-            sns.histplot(data=df, x=col, hue='burnout_risk', kde=True)
-            plt.title(f'Distribution of {col} by Burnout Risk')
-            st.pyplot(plt)
+        plt.figure(figsize=(10, 6))
+        sns.histplot(data=df, x=col, hue='Risk Indicator', kde=True)
+        plt.title(f'Distribution of {col} by Risk Indicator')
+        st.pyplot(plt)
 
 def data_upload_page():
     st.subheader("Data Upload")
@@ -153,10 +159,12 @@ def predictions_page():
     if st.button("Predict"):
         input_df = pd.DataFrame([input_data])
         prediction = model.predict(input_df)
-        probability = model.predict_proba(input_df)[0][1]
+        probability = model.predict_proba(input_df)[0]
 
-        st.write(f"Predicted Burnout Risk: {'High' if prediction[0] == 1 else 'Low'}")
-        st.write(f"Probability of High Burnout Risk: {probability:.2f}")
+        st.write(f"Predicted Risk Indicator: {prediction[0]}")
+        st.write(f"Probability of Risk Levels:")
+        for risk_level, prob in zip(model.classes_, probability):
+            st.write(f"{risk_level}: {prob:.2f}")
 
 def main():
     st.title("Agent Burnout Risk Classification App")
