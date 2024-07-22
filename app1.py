@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import joblib
 import streamlit as st
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -15,29 +15,24 @@ def preprocess_data(file_path):
     data = pd.read_csv(file_path)
     
     # Convert necessary columns to numeric types
-    data['Average of AHT (seconds)'] = pd.to_numeric(data['Average of AHT (seconds)'], errors='coerce')
-    data['Average of Attendance'] = pd.to_numeric(data['Average of Attendance'], errors='coerce')
-    data['Average of CSAT (%)'] = pd.to_numeric(data['Average of CSAT (%)'], errors='coerce')
-    data['Attrition Flag'] = pd.to_numeric(data['Attrition Flag'], errors='coerce')
+    numeric_columns = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)', 'Attrition Flag']
+    for col in numeric_columns:
+        data[col] = pd.to_numeric(data[col], errors='coerce')
     
     data.fillna(data.mean(), inplace=True)
     
-    # One-hot encode the 'Risk Indicator' column
-    encoder = OneHotEncoder(sparse=False)
-    risk_indicator_encoded = encoder.fit_transform(data[['Risk Indicator']])
-    risk_indicator_df = pd.DataFrame(risk_indicator_encoded, columns=encoder.get_feature_names_out(['Risk Indicator']))
+    # Label encode the 'Risk Indicator' column
+    le = LabelEncoder()
+    data['Risk Indicator'] = le.fit_transform(data['Risk Indicator'])
     
-    # Concatenate the one-hot encoded columns back to the original dataframe
-    data = pd.concat([data, risk_indicator_df], axis=1)
-    
-    # Drop the original 'Risk Indicator' and any other non-feature columns
+    # Separate features and target
     X = data.drop(columns=['Agent ID', 'Risk Indicator'])
     y = data['Risk Indicator']
     
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    return X_scaled, y, scaler
+    return X_scaled, y, scaler, le
 
 def train_models(X, y):
     models = {
@@ -107,8 +102,9 @@ def main():
         if 'file_uploaded' in st.session_state and st.session_state.file_uploaded:
             if st.button("Prepare Data"):
                 try:
-                    X, y, scaler = preprocess_data(FILE_PATH)
+                    X, y, scaler, le = preprocess_data(FILE_PATH)
                     joblib.dump(scaler, 'scaler.joblib')
+                    joblib.dump(le, 'label_encoder.joblib')
                     st.success("Data prepared successfully.")
                 except Exception as e:
                     st.error(f"Error during data preparation: {e}")
@@ -122,13 +118,13 @@ def main():
         if 'file_uploaded' in st.session_state and st.session_state.file_uploaded:
             if st.button("Train Models"):
                 try:
-                    X, y, scaler = preprocess_data(FILE_PATH)
+                    X, y, scaler, le = preprocess_data(FILE_PATH)
                     models = train_models(X, y)
                     for model_name in MODEL_NAMES:
                         model = joblib.load(f'{model_name}.joblib')
                         y_pred = model.predict(X)
                         accuracy = accuracy_score(y, y_pred)
-                        report = classification_report(y, y_pred, target_names=['Low Risk', 'Medium Risk', 'High Risk'])
+                        report = classification_report(y, y_pred, target_names=le.classes_)
                         st.write(f"{model_name} model accuracy: {accuracy}")
                         st.text(report)
                 except Exception as e:
@@ -155,12 +151,13 @@ def main():
                 }
                 input_df = pd.DataFrame([input_data])
                 scaler = joblib.load('scaler.joblib')
+                le = joblib.load('label_encoder.joblib')
                 input_scaled = scaler.transform(input_df)
                 predictions = {}
                 for model_name in MODEL_NAMES:
                     model = joblib.load(f'{model_name}.joblib')
                     prediction = model.predict(input_scaled)[0]
-                    predictions[model_name] = ['Low Risk', 'Medium Risk', 'High Risk'][prediction]
+                    predictions[model_name] = le.inverse_transform([prediction])[0]
                 st.write("Predictions:")
                 for model_name, prediction in predictions.items():
                     st.write(f"{model_name}: {prediction}")
