@@ -36,7 +36,10 @@ def main():
             data = pd.read_csv(FILE_PATH)
             st.write(data.head())
             if st.button('Show Scatter Plot'):
-                st.scatter_chart(data)
+                try:
+                    st.scatter_chart(data, x='Average of AHT (seconds)', y='Average of Attendance')
+                except Exception as e:
+                    st.error(f"Error creating scatter plot: {e}")
 
     elif page == "Data Upload":
         st.markdown("""
@@ -100,23 +103,26 @@ def main():
         attrition = st.text_input("Attrition Flag")
         
         if st.button("Predict"):
-            input_data = {
-                "Average of AHT (seconds)": aht,
-                "Average of Attendance": attendance,
-                "Average of CSAT (%)": csat,
-                "Attrition Flag": attrition
-            }
-            input_df = pd.DataFrame([input_data])
-            scaler = joblib.load('scaler.joblib')
-            input_scaled = scaler.transform(input_df)
-            predictions = {}
-            for model_name in MODEL_NAMES:
-                model = joblib.load(f'{model_name}.joblib')
-                prediction = model.predict(input_scaled)[0]
-                predictions[model_name] = ['Low Risk', 'Medium Risk', 'High Risk'][prediction]
-            st.write("Predictions:")
-            for model_name, prediction in predictions.items():
-                st.write(f"{model_name}: {prediction}")
+            try:
+                input_data = {
+                    "Average of AHT (seconds)": aht,
+                    "Average of Attendance": attendance,
+                    "Average of CSAT (%)": csat,
+                    "Attrition Flag": attrition
+                }
+                input_df = pd.DataFrame([input_data])
+                scaler = joblib.load('scaler.joblib')
+                input_scaled = scaler.transform(input_df)
+                predictions = {}
+                for model_name in MODEL_NAMES:
+                    model = joblib.load(f'{model_name}.joblib')
+                    prediction = model.predict(input_scaled)[0]
+                    predictions[model_name] = ['Low Risk', 'Medium Risk', 'High Risk'][prediction]
+                st.write("Predictions:")
+                for model_name, prediction in predictions.items():
+                    st.write(f"{model_name}: {prediction}")
+            except Exception as e:
+                st.error(f"Error during prediction: {e}")
 
     elif page == "Database":
         st.markdown("""
