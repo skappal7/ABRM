@@ -39,7 +39,7 @@ def rounded_rectangle(color, value):
         flex-direction: column;
         justify-content: center;
     ">
-        <p style="color: white; margin: 0; font-size: 24px; font-weight: bold;">{value}</p>
+        <p style="color: white; margin: 0; font-size: 20px; font-weight: bold;">{value}</p>
     </div>
     """
 
