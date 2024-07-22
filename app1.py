@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import io
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, roc_curve, auc
@@ -104,7 +105,20 @@ def preprocess_data(df, selected_features):
 
     X = df[selected_features]
     y = df['Risk Indicator']
+
+    # Handle NaN values
+    X = X.fillna(X.mean())  # Fill NaN with mean of the column
+    y = y.fillna(y.mode()[0])  # Fill NaN with mode (most frequent value)
+
     X = pd.get_dummies(X)
+
+    # Remove any remaining NaN values
+    X = X.dropna()
+    y = y[X.index]
+
+    if X.empty or y.empty:
+        st.error("After removing NaN values, no data remains. Please check your input data.")
+        return None, None
 
     return X, y
 
@@ -219,6 +233,19 @@ def data_upload_page():
         if df is not None:
             st.write("Data loaded successfully!")
             st.write(df.head())
+            
+            # Check for NaN values
+            nan_counts = df.isna().sum()
+            if nan_counts.sum() > 0:
+                st.warning("Your data contains NaN values:")
+                st.write(nan_counts[nan_counts > 0])
+            
+            # Display data info
+            buffer = io.StringIO()
+            df.info(buf=buffer)
+            s = buffer.getvalue()
+            st.text(s)
+            
             st.session_state['df'] = df
             visualize_data(df)
 
@@ -240,12 +267,18 @@ def model_training_page():
     X, y = preprocess_data(df, selected_features)
 
     if X is not None and y is not None:
+        st.write("Shape of processed data:")
+        st.write(f"X: {X.shape}, y: {y.shape}")
+        
         if st.button("Train Model"):
-            model, X_test, y_test = train_model(X, y)
-            st.write("Model trained successfully!")
-            st.session_state['model'] = model
-            st.session_state['X'] = X
-            evaluate_model(model, X_test, y_test)
+            if X.shape[0] > 0 and y.shape[0] > 0:
+                model, X_test, y_test = train_model(X, y)
+                st.write("Model trained successfully!")
+                st.session_state['model'] = model
+                st.session_state['X'] = X
+                evaluate_model(model, X_test, y_test)
+            else:
+                st.error("Not enough data to train the model. Please check your input data.")
 
 def predictions_page():
     st.subheader("Make Predictions")
@@ -319,28 +352,3 @@ def predictions_page():
 
 def main():
     # Add logo
-    logo = load_image_from_url(logo_url)
-    st.sidebar.image(logo, width=200)
-
-    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
-        login()
-    else:
-        st.title("Agent Burnout Risk Classification App")
-
-        st.write("""
-        This app predicts the burnout risk for agents based on various features.
-        Upload your data, train the model, and make predictions!
-        """)
-
-        st.sidebar.title("Navigation")
-        page = st.sidebar.radio("Go to", ["Data Upload", "Model Training", "Predictions"])
-
-        if page == "Data Upload":
-            data_upload_page()
-        elif page == "Model Training":
-            model_training_page()
-        elif page == "Predictions":
-            predictions_page()
-
-if __name__ == "__main__":
-    main()
