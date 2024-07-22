@@ -1,7 +1,7 @@
+streamlit
 pandas
+numpy
 scikit-learn
-joblib
-openpyxl
-taipy
-seaborn
 matplotlib
+seaborn
+openpyxl
