@@ -1,186 +1,180 @@
-import os
-import pandas as pd
-import joblib
 import streamlit as st
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, classification_report
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-FILE_PATH = 'ABRMData.csv'
-MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
+st.set_page_config(page_title="Agent Burnout Risk Classification App", layout="wide")
 
-def preprocess_data(file_path):
-    data = pd.read_csv(file_path)
-    
-    # Convert necessary columns to numeric types
-    numeric_columns = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)', 'Attrition Flag']
-    for col in numeric_columns:
-        data[col] = pd.to_numeric(data[col], errors='coerce')
-    
-    data.fillna(data.mean(), inplace=True)
-    
-    # Handle the incorrectly formatted 'Risk Indicator' column
-    if 'Risk Indicator' in data.columns and isinstance(data['Risk Indicator'].iloc[0], str):
-        risk_indicators = data['Risk Indicator'].iloc[0].replace('[', '').replace(']', '').replace("'", "").split()
-        data['Risk Indicator'] = risk_indicators
-    
-    # Label encode the 'Risk Indicator' column
-    le = LabelEncoder()
-    data['Risk Indicator'] = le.fit_transform(data['Risk Indicator'])
-    
-    # Separate features and target
-    X = data.drop(columns=['Agent ID', 'Risk Indicator'])
-    y = data['Risk Indicator']
-    
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    return X_scaled, y, scaler, le
+def load_data(file):
+    try:
+        if file.name.endswith('.csv'):
+            df = pd.read_csv(file)
+        elif file.name.endswith('.xlsx'):
+            df = pd.read_excel(file)
+        else:
+            st.error("Unsupported file format. Please upload a CSV or Excel file.")
+            return None
+        return df
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
 
-def train_models(X, y):
-    models = {
-        'Logistic Regression': LogisticRegression(),
-        'Decision Tree': DecisionTreeClassifier(),
-        'Random Forest': RandomForestClassifier(),
-        'Gradient Boosting': GradientBoostingClassifier()
-    }
-    
-    for model_name, model in models.items():
-        model.fit(X, y)
-        joblib.dump(model, f'{model_name}.joblib')
+def preprocess_data(df):
+    if 'burnout_risk' not in df.columns:
+        st.error("The dataset must contain a 'burnout_risk' column.")
+        return None, None
 
-    return models
+    X = df.drop('burnout_risk', axis=1)
+    y = df['burnout_risk']
+    X = pd.get_dummies(X)
+
+    return X, y
+
+def train_model(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    
+    return model, X_test, y_test
+
+def evaluate_model(model, X_test, y_test):
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    st.pyplot(plt)
+
+    # ROC Curve
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    st.pyplot(plt)
+
+    # Feature Importance
+    feature_importance = pd.DataFrame({
+        'feature': X_test.columns,
+        'importance': model.feature_importances_
+    }).sort_values('importance', ascending=False)
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='importance', y='feature', data=feature_importance.head(10))
+    plt.title('Top 10 Feature Importances')
+    plt.xlabel('Importance')
+    plt.ylabel('Feature')
+    st.pyplot(plt)
+
+def visualize_data(df):
+    st.subheader("Data Visualization")
+
+    # Correlation heatmap
+    corr = df.corr()
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(corr, annot=True, cmap='coolwarm', linewidths=0.5)
+    plt.title('Correlation Heatmap')
+    st.pyplot(plt)
+
+    # Distribution of target variable
+    plt.figure(figsize=(8, 6))
+    sns.countplot(x='burnout_risk', data=df)
+    plt.title('Distribution of Burnout Risk')
+    st.pyplot(plt)
+
+    # Feature distributions
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    for col in num_cols:
+        if col != 'burnout_risk':
+            plt.figure(figsize=(8, 6))
+            sns.histplot(data=df, x=col, hue='burnout_risk', kde=True)
+            plt.title(f'Distribution of {col} by Burnout Risk')
+            st.pyplot(plt)
+
+def data_upload_page():
+    st.subheader("Data Upload")
+    uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx"])
+
+    if uploaded_file is not None:
+        df = load_data(uploaded_file)
+        if df is not None:
+            st.write("Data loaded successfully!")
+            st.write(df.head())
+            st.session_state['df'] = df
+            visualize_data(df)
+
+def model_training_page():
+    st.subheader("Model Training")
+    if 'df' not in st.session_state:
+        st.warning("Please upload data first.")
+        return
+
+    df = st.session_state['df']
+    X, y = preprocess_data(df)
+
+    if X is not None and y is not None:
+        if st.button("Train Model"):
+            model, X_test, y_test = train_model(X, y)
+            st.write("Model trained successfully!")
+            st.session_state['model'] = model
+            st.session_state['X'] = X
+            evaluate_model(model, X_test, y_test)
+
+def predictions_page():
+    st.subheader("Make Predictions")
+    if 'model' not in st.session_state or 'X' not in st.session_state:
+        st.warning("Please train the model first.")
+        return
+
+    model = st.session_state['model']
+    X = st.session_state['X']
+
+    input_data = {}
+    for column in X.columns:
+        input_data[column] = st.number_input(f"Enter {column}", value=0.0)
+
+    if st.button("Predict"):
+        input_df = pd.DataFrame([input_data])
+        prediction = model.predict(input_df)
+        probability = model.predict_proba(input_df)[0][1]
+
+        st.write(f"Predicted Burnout Risk: {'High' if prediction[0] == 1 else 'Low'}")
+        st.write(f"Probability of High Burnout Risk: {probability:.2f}")
 
 def main():
-    st.title("Agent Burnout Prediction")
-    
-    # Navigation sidebar
-    page = st.sidebar.selectbox(
-        "Choose a page:",
-        ["Introduction", "Data Visualization", "Data Upload", "Data Preparation", "Model Training", "Prediction", "Database"]
-    )
+    st.title("Agent Burnout Risk Classification App")
 
-    if page == "Introduction":
-        st.markdown("""
-        # Agent Burnout Prediction
+    st.write("""
+    This app predicts the burnout risk for agents based on various features.
+    Upload your data, train the model, and make predictions!
+    """)
 
-        Burnout risk is a significant issue in workplaces. This application helps predict the risk of burnout for agents based on historical data and various metrics.
-        """)
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Data Upload", "Model Training", "Predictions"])
 
-    elif page == "Data Visualization":
-        st.markdown("""
-        ## Data Visualization
-
-        Visualize the dataset with scatter plots and histograms.
-        """)
-        if os.path.exists(FILE_PATH):
-            data = pd.read_csv(FILE_PATH)
-            st.write(data.head())
-            if st.button('Show Scatter Plot'):
-                try:
-                    st.scatter_chart(data, x='Average of AHT (seconds)', y='Average of Attendance')
-                except Exception as e:
-                    st.error(f"Error creating scatter plot: {e}")
-
-    elif page == "Data Upload":
-        st.markdown("""
-        ## Data Upload
-
-        Upload your dataset here.
-        """)
-        uploaded_file = st.file_uploader("Choose a file", type=['csv'])
-        if uploaded_file is not None:
-            file_path = os.path.join(os.getcwd(), FILE_PATH)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getvalue())
-            st.success("File uploaded successfully")
-            st.session_state.file_uploaded = True
-
-    elif page == "Data Preparation":
-        st.markdown("""
-        ## Data Preparation
-
-        Preprocess and prepare your data for model training.
-        """)
-        if 'file_uploaded' in st.session_state and st.session_state.file_uploaded:
-            if st.button("Prepare Data"):
-                try:
-                    X, y, scaler, le = preprocess_data(FILE_PATH)
-                    joblib.dump(scaler, 'scaler.joblib')
-                    joblib.dump(le, 'label_encoder.joblib')
-                    st.success("Data prepared successfully.")
-                    st.write(f"Number of features: {X.shape[1]}")
-                    st.write(f"Number of samples: {X.shape[0]}")
-                    st.write(f"Risk categories: {', '.join(le.classes_)}")
-                except Exception as e:
-                    st.error(f"Error during data preparation: {e}")
-                    st.write("Error details:")
-                    st.write(pd.read_csv(FILE_PATH).head())  # Display the first few rows of the raw data
-
+    if page == "Data Upload":
+        data_upload_page()
     elif page == "Model Training":
-        st.markdown("""
-        ## Model Training
-
-        Train machine learning models and evaluate their performance.
-        """)
-        if 'file_uploaded' in st.session_state and st.session_state.file_uploaded:
-            if st.button("Train Models"):
-                try:
-                    X, y, scaler, le = preprocess_data(FILE_PATH)
-                    models = train_models(X, y)
-                    for model_name in MODEL_NAMES:
-                        model = joblib.load(f'{model_name}.joblib')
-                        y_pred = model.predict(X)
-                        accuracy = accuracy_score(y, y_pred)
-                        report = classification_report(y, y_pred, target_names=le.classes_)
-                        st.write(f"{model_name} model accuracy: {accuracy}")
-                        st.text(report)
-                except Exception as e:
-                    st.error(f"Error during model training: {e}")
-
-    elif page == "Prediction":
-        st.markdown("""
-        ## Prediction
-
-        Input new data to predict burnout risk.
-        """)
-        aht = st.text_input("Average of AHT (seconds)")
-        attendance = st.text_input("Average of Attendance")
-        csat = st.text_input("Average of CSAT (%)")
-        attrition = st.text_input("Attrition Flag")
-        
-        if st.button("Predict"):
-            try:
-                input_data = {
-                    "Average of AHT (seconds)": aht,
-                    "Average of Attendance": attendance,
-                    "Average of CSAT (%)": csat,
-                    "Attrition Flag": attrition
-                }
-                input_df = pd.DataFrame([input_data])
-                scaler = joblib.load('scaler.joblib')
-                le = joblib.load('label_encoder.joblib')
-                input_scaled = scaler.transform(input_df)
-                predictions = {}
-                for model_name in MODEL_NAMES:
-                    model = joblib.load(f'{model_name}.joblib')
-                    prediction = model.predict(input_scaled)[0]
-                    predictions[model_name] = le.inverse_transform([prediction])[0]
-                st.write("Predictions:")
-                for model_name, prediction in predictions.items():
-                    st.write(f"{model_name}: {prediction}")
-            except Exception as e:
-                st.error(f"Error during prediction: {e}")
-
-    elif page == "Database":
-        st.markdown("""
-        ## Database
-
-        View and download predictions and probabilities.
-        """)
-        # Database related functionalities can be implemented here
+        model_training_page()
+    elif page == "Predictions":
+        predictions_page()
 
 if __name__ == "__main__":
     main()
