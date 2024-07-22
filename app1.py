@@ -29,7 +29,7 @@ def rounded_rectangle(color, value):
     return f"""
     <div style="
         background-color: {color};
-        padding: 15px;
+        padding: 10px;
         border-radius: 10px;
         box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
         margin: 10px;
