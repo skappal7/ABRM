@@ -210,6 +210,76 @@ def model_training_page():
             evaluate_model(model, X_test, y_test)
 
 # predictions_page function remains the same
+def predictions_page():
+    st.subheader("Make Predictions")
+    
+    prediction_method = st.radio("Choose prediction method:", ["Manual Input", "File Upload"])
+    
+    if prediction_method == "Manual Input":
+        if 'model' not in st.session_state or 'X' not in st.session_state:
+            st.warning("Please train the model first.")
+            return
+
+        model = st.session_state['model']
+        X = st.session_state['X']
+
+        input_data = {}
+        for column in X.columns:
+            input_data[column] = st.number_input(f"Enter {column}", value=0.0)
+
+        if st.button("Predict"):
+            input_df = pd.DataFrame([input_data])
+            prediction = model.predict(input_df)
+            probability = model.predict_proba(input_df)[0]
+
+            st.write(f"Predicted Risk Indicator: {prediction[0]}")
+            st.write(f"Probability of Risk Levels:")
+            for risk_level, prob in zip(model.classes_, probability):
+                st.write(f"{risk_level}: {prob:.2f}")
+    
+    else:  # File Upload
+        uploaded_file = st.file_uploader("Choose a CSV or Excel file for predictions", type=["csv", "xlsx"])
+        if uploaded_file is not None:
+            df = load_data(uploaded_file)
+            if df is not None:
+                st.write("Data loaded successfully!")
+                st.write(df.head())
+                
+                if 'model' not in st.session_state:
+                    st.warning("Please train the model first.")
+                    return
+                
+                model = st.session_state['model']
+                
+                # Prepare the data for prediction
+                X_pred = df.drop(['Agent ID'], axis=1, errors='ignore')
+                X_pred = pd.get_dummies(X_pred)
+                
+                # Align the columns with the training data
+                X_train_columns = st.session_state['X'].columns
+                X_pred = X_pred.reindex(columns=X_train_columns, fill_value=0)
+                
+                # Make predictions
+                predictions = model.predict(X_pred)
+                probabilities = model.predict_proba(X_pred)
+                
+                # Add predictions to the dataframe
+                df['Predicted Risk Indicator'] = predictions
+                for i, class_name in enumerate(model.classes_):
+                    df[f'Probability_{class_name}'] = probabilities[:, i]
+                
+                st.write("Predictions:")
+                st.write(df)
+                
+                # Download predictions
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download predictions as CSV",
+                    data=csv,
+                    file_name="predictions.csv",
+                    mime="text/csv",
+                )
+
 
 def main():
     # Add logo
