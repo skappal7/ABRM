@@ -6,8 +6,77 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 import matplotlib.pyplot as plt
 import seaborn as sns
+import requests
+from io import BytesIO
+from PIL import Image
 
+# Set page config
 st.set_page_config(page_title="Agent Burnout Risk Classification App", layout="wide")
+
+# Function to load image from URL
+def load_image_from_url(url):
+    response = requests.get(url)
+    return Image.open(BytesIO(response.content))
+
+# Background image URL
+bg_image_url = "https://www.flatworldsolutions.com/call-center/images/what-are-the-top-10-qualities-a-call-center-agent-should-possess.jpg"
+
+# Logo URL
+logo_url = "https://humach.com/wp-content/uploads/2023/01/HuMach_logo-bold.png"
+
+# Function to create rounded rectangle with shadow
+def rounded_rectangle(color, text, value):
+    return f"""
+    <div style="
+        background-color: {color};
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+        margin: 10px;
+        text-align: center;
+    ">
+        <h3 style="color: white;">{text}</h3>
+        <h2 style="color: white;">{value}</h2>
+    </div>
+    """
+
+# Login function
+def login():
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("{bg_image_url}");
+            background-size: cover;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown(
+            """
+            <div style="
+                background-color: rgba(255,255,255,0.7);
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+            ">
+            <h2 style="text-align: center;">Login</h2>
+            """, 
+            unsafe_allow_html=True
+        )
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if username == "humach" and password == "password":
+                st.session_state['logged_in'] = True
+                st.experimental_rerun()
+            else:
+                st.error("Incorrect username or password")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def load_data(file):
     try:
@@ -50,9 +119,9 @@ def evaluate_model(model, X_test, y_test):
     cm = confusion_matrix(y_test, y_pred)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix')
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
+    plt.title('Confusion Matrix', fontsize=16)
+    plt.xlabel('Predicted', fontsize=12)
+    plt.ylabel('Actual', fontsize=12)
     st.pyplot(plt)
 
     # ROC Curve (for multi-class, we'll use one-vs-rest)
@@ -71,9 +140,9 @@ def evaluate_model(model, X_test, y_test):
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.xlabel('False Positive Rate', fontsize=12)
+    plt.ylabel('True Positive Rate', fontsize=12)
+    plt.title('Receiver Operating Characteristic (ROC) Curve', fontsize=16)
     plt.legend(loc="lower right")
     st.pyplot(plt)
 
@@ -85,33 +154,51 @@ def evaluate_model(model, X_test, y_test):
 
     plt.figure(figsize=(10, 8))
     sns.barplot(x='importance', y='feature', data=feature_importance.head(10))
-    plt.title('Top 10 Feature Importances')
-    plt.xlabel('Importance')
-    plt.ylabel('Feature')
+    plt.title('Top 10 Feature Importances', fontsize=16)
+    plt.xlabel('Importance', fontsize=12)
+    plt.ylabel('Feature', fontsize=12)
     st.pyplot(plt)
 
 def visualize_data(df):
     st.subheader("Data Visualization")
 
+    # Key Metrics
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.markdown(rounded_rectangle("#1f77b4", "Agents Count", len(df['Agent ID'].unique())), unsafe_allow_html=True)
+    with col2:
+        risk_percentages = df['Risk Indicator'].value_counts(normalize=True) * 100
+        st.markdown(rounded_rectangle("#ff7f0e", "High Risk %", f"{risk_percentages.get('High Risk', 0):.1f}%"), unsafe_allow_html=True)
+    with col3:
+        st.markdown(rounded_rectangle("#2ca02c", "Avg AHT", f"{df['Average of AHT (seconds)'].mean():.0f}s"), unsafe_allow_html=True)
+    with col4:
+        st.markdown(rounded_rectangle("#d62728", "Avg CSAT", f"{df['Average of CSAT (%)'].mean():.1f}%"), unsafe_allow_html=True)
+    with col5:
+        st.markdown(rounded_rectangle("#9467bd", "Avg Attendance", f"{df['Average of Attendance'].mean():.1f}%"), unsafe_allow_html=True)
+
     # Correlation heatmap
     corr = df.drop(['Agent ID', 'Risk Indicator'], axis=1).corr()
     plt.figure(figsize=(12, 10))
     sns.heatmap(corr, annot=True, cmap='coolwarm', linewidths=0.5)
-    plt.title('Correlation Heatmap')
+    plt.title('Correlation Heatmap', fontsize=16)
     st.pyplot(plt)
 
     # Distribution of target variable
     plt.figure(figsize=(10, 6))
-    sns.countplot(x='Risk Indicator', data=df)
-    plt.title('Distribution of Risk Indicator')
+    sns.countplot(x='Risk Indicator', data=df, palette='viridis')
+    plt.title('Distribution of Risk Indicator', fontsize=16)
+    plt.xlabel('Risk Indicator', fontsize=12)
+    plt.ylabel('Count', fontsize=12)
     st.pyplot(plt)
 
     # Feature distributions
     num_cols = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)']
     for col in num_cols:
         plt.figure(figsize=(10, 6))
-        sns.histplot(data=df, x=col, hue='Risk Indicator', kde=True)
-        plt.title(f'Distribution of {col} by Risk Indicator')
+        sns.histplot(data=df, x=col, hue='Risk Indicator', kde=True, palette='viridis')
+        plt.title(f'Distribution of {col} by Risk Indicator', fontsize=16)
+        plt.xlabel(col, fontsize=12)
+        plt.ylabel('Count', fontsize=12)
         st.pyplot(plt)
 
 def data_upload_page():
@@ -167,22 +254,29 @@ def predictions_page():
             st.write(f"{risk_level}: {prob:.2f}")
 
 def main():
-    st.title("Agent Burnout Risk Classification App")
+    # Add logo
+    logo = load_image_from_url(logo_url)
+    st.sidebar.image(logo, width=200)
 
-    st.write("""
-    This app predicts the burnout risk for agents based on various features.
-    Upload your data, train the model, and make predictions!
-    """)
+    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+        login()
+    else:
+        st.title("Agent Burnout Risk Classification App")
 
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Data Upload", "Model Training", "Predictions"])
+        st.write("""
+        This app predicts the burnout risk for agents based on various features.
+        Upload your data, train the model, and make predictions!
+        """)
 
-    if page == "Data Upload":
-        data_upload_page()
-    elif page == "Model Training":
-        model_training_page()
-    elif page == "Predictions":
-        predictions_page()
+        st.sidebar.title("Navigation")
+        page = st.sidebar.radio("Go to", ["Data Upload", "Model Training", "Predictions"])
+
+        if page == "Data Upload":
+            data_upload_page()
+        elif page == "Model Training":
+            model_training_page()
+        elif page == "Predictions":
+            predictions_page()
 
 if __name__ == "__main__":
     main()
