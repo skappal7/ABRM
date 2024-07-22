@@ -12,6 +12,9 @@ def preprocess_data(file_path):
     
     data.fillna(data.mean(), inplace=True)
     
+    # Convert 'Risk Indicator' to categorical
+    data['Risk Indicator'] = data['Risk Indicator'].astype('category')
+    
     # One-hot encode the 'Risk Indicator' column
     encoder = OneHotEncoder()
     risk_indicator_encoded = encoder.fit_transform(data[['Risk Indicator']]).toarray()
