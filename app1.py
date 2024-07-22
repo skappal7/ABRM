@@ -13,19 +13,17 @@ from PIL import Image
 # Set page config
 st.set_page_config(page_title="Agent Burnout Risk Classification App", layout="wide")
 
+# Background image URL and Logo URL
+bg_image_url = "https://www.flatworldsolutions.com/call-center/images/what-are-the-top-10-qualities-a-call-center-agent-should-possess.jpg"
+logo_url = "https://humach.com/wp-content/uploads/2023/01/HuMach_logo-bold.png"
+
 # Function to load image from URL
 def load_image_from_url(url):
     response = requests.get(url)
     return Image.open(BytesIO(response.content))
 
-# Background image URL
-bg_image_url = "https://www.flatworldsolutions.com/call-center/images/what-are-the-top-10-qualities-a-call-center-agent-should-possess.jpg"
-
-# Logo URL
-logo_url = "https://humach.com/wp-content/uploads/2023/01/HuMach_logo-bold.png"
-
 # Function to create rounded rectangle with shadow
-def rounded_rectangle(color, text, value):
+def rounded_rectangle(color, value):
     return f"""
     <div style="
         background-color: {color};
@@ -34,13 +32,12 @@ def rounded_rectangle(color, text, value):
         box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
         margin: 10px;
         text-align: center;
-        height: 120px;
+        height: 80px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     ">
-        <h4 style="color: white; margin: 0; font-size: 16px;">{text}</h4>
-        <p style="color: white; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{value}</p>
+        <p style="color: white; margin: 0; font-size: 24px; font-weight: bold;">{value}</p>
     </div>
     """
 
@@ -100,12 +97,12 @@ def load_data(file):
         st.error(f"Error loading file: {e}")
         return None
 
-def preprocess_data(df):
+def preprocess_data(df, selected_features):
     if 'Risk Indicator' not in df.columns:
         st.error("The dataset must contain a 'Risk Indicator' column.")
         return None, None
 
-    X = df.drop(['Risk Indicator', 'Agent ID', 'Attrition Flag'], axis=1)
+    X = df[selected_features]
     y = df['Risk Indicator']
     X = pd.get_dummies(X)
 
@@ -125,14 +122,14 @@ def evaluate_model(model, X_test, y_test):
 
     # Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix', fontsize=16)
-    plt.xlabel('Predicted', fontsize=12)
-    plt.ylabel('Actual', fontsize=12)
-    st.pyplot(plt)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+    ax.set_title('Confusion Matrix', fontsize=14)
+    ax.set_xlabel('Predicted', fontsize=10)
+    ax.set_ylabel('Actual', fontsize=10)
+    st.pyplot(fig)
 
-    # ROC Curve (for multi-class, we'll use one-vs-rest)
+    # ROC Curve
     n_classes = len(model.classes_)
     fpr = dict()
     tpr = dict()
@@ -141,18 +138,17 @@ def evaluate_model(model, X_test, y_test):
         fpr[i], tpr[i], _ = roc_curve(y_test == model.classes_[i], y_prob[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    plt.figure(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for i in range(n_classes):
-        plt.plot(fpr[i], tpr[i], lw=2,
-                 label=f'ROC curve (AUC = {roc_auc[i]:.2f}) for {model.classes_[i]}')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate', fontsize=12)
-    plt.ylabel('True Positive Rate', fontsize=12)
-    plt.title('Receiver Operating Characteristic (ROC) Curve', fontsize=16)
-    plt.legend(loc="lower right")
-    st.pyplot(plt)
+        ax.plot(fpr[i], tpr[i], lw=2, label=f'ROC curve (AUC = {roc_auc[i]:.2f}) for {model.classes_[i]}')
+    ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate', fontsize=10)
+    ax.set_ylabel('True Positive Rate', fontsize=10)
+    ax.set_title('Receiver Operating Characteristic (ROC) Curve', fontsize=14)
+    ax.legend(loc="lower right")
+    st.pyplot(fig)
 
     # Feature Importance
     feature_importance = pd.DataFrame({
@@ -160,54 +156,59 @@ def evaluate_model(model, X_test, y_test):
         'importance': model.feature_importances_
     }).sort_values('importance', ascending=False)
 
-    plt.figure(figsize=(10, 8))
-    sns.barplot(x='importance', y='feature', data=feature_importance.head(10))
-    plt.title('Top 10 Feature Importances', fontsize=16)
-    plt.xlabel('Importance', fontsize=12)
-    plt.ylabel('Feature', fontsize=12)
-    st.pyplot(plt)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.barplot(x='importance', y='feature', data=feature_importance.head(10), ax=ax)
+    ax.set_title('Top 10 Feature Importances', fontsize=14)
+    ax.set_xlabel('Importance', fontsize=10)
+    ax.set_ylabel('Feature', fontsize=10)
+    st.pyplot(fig)
 
 def visualize_data(df):
     st.subheader("Data Visualization")
 
     # Key Metrics
     col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.markdown(rounded_rectangle("#1f77b4", "Agents Count", f"{len(df['Agent ID'].unique()):,}"), unsafe_allow_html=True)
-    with col2:
-        risk_percentages = df['Risk Indicator'].value_counts(normalize=True) * 100
-        st.markdown(rounded_rectangle("#ff7f0e", "High Risk %", f"{risk_percentages.get('High Risk', 0):.1f}%"), unsafe_allow_html=True)
-    with col3:
-        st.markdown(rounded_rectangle("#2ca02c", "Avg AHT", f"{df['Average of AHT (seconds)'].mean():.0f}s"), unsafe_allow_html=True)
-    with col4:
-        st.markdown(rounded_rectangle("#d62728", "Avg CSAT", f"{df['Average of CSAT (%)'].mean():.1f}%"), unsafe_allow_html=True)
-    with col5:
-        st.markdown(rounded_rectangle("#9467bd", "Avg Attendance", f"{df['Average of Attendance'].mean():.1f}%"), unsafe_allow_html=True)
+    metrics = [
+        ("Agents Count", len(df['Agent ID'].unique()), col1),
+        ("High Risk %", f"{df['Risk Indicator'].value_counts(normalize=True).get('High Risk', 0)*100:.1f}%", col2),
+        ("Avg AHT", f"{df['Average of AHT (seconds)'].mean():.0f}s", col3),
+        ("Avg CSAT", f"{df['Average of CSAT (%)'].mean():.1f}%", col4),
+        ("Avg Attendance", f"{df['Average of Attendance'].mean():.1f}%", col5)
+    ]
 
-    # Correlation heatmap
-    corr = df.drop(['Agent ID', 'Risk Indicator'], axis=1).corr()
-    plt.figure(figsize=(12, 10))
-    sns.heatmap(corr, annot=True, cmap='coolwarm', linewidths=0.5)
-    plt.title('Correlation Heatmap', fontsize=16)
-    st.pyplot(plt)
+    for i, (name, value, col) in enumerate(metrics):
+        with col:
+            st.markdown(f"<p style='text-align: center; font-size: 14px; font-weight: bold;'>{name}</p>", unsafe_allow_html=True)
+            st.markdown(rounded_rectangle(f"rgba(0, 100, 200, {0.5 + i*0.1})", value), unsafe_allow_html=True)
 
-    # Distribution of target variable
-    plt.figure(figsize=(10, 6))
-    sns.countplot(x='Risk Indicator', data=df, palette='viridis')
-    plt.title('Distribution of Risk Indicator', fontsize=16)
-    plt.xlabel('Risk Indicator', fontsize=12)
-    plt.ylabel('Count', fontsize=12)
-    st.pyplot(plt)
+    # Charts
+    chart_types = ["Correlation Heatmap", "Risk Distribution", "Feature Distributions"]
+    selected_chart = st.selectbox("Select chart to view", chart_types)
 
-    # Feature distributions
-    num_cols = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)']
-    for col in num_cols:
-        plt.figure(figsize=(10, 6))
-        sns.histplot(data=df, x=col, hue='Risk Indicator', kde=True, palette='viridis')
-        plt.title(f'Distribution of {col} by Risk Indicator', fontsize=16)
-        plt.xlabel(col, fontsize=12)
-        plt.ylabel('Count', fontsize=12)
-        st.pyplot(plt)
+    if selected_chart == "Correlation Heatmap":
+        corr = df.drop(['Agent ID', 'Risk Indicator'], axis=1).corr()
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', linewidths=0.5, ax=ax)
+        ax.set_title('Correlation Heatmap', fontsize=14)
+        st.pyplot(fig)
+
+    elif selected_chart == "Risk Distribution":
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.countplot(x='Risk Indicator', data=df, palette='viridis', ax=ax)
+        ax.set_title('Distribution of Risk Indicator', fontsize=14)
+        ax.set_xlabel('Risk Indicator', fontsize=10)
+        ax.set_ylabel('Count', fontsize=10)
+        st.pyplot(fig)
+
+    elif selected_chart == "Feature Distributions":
+        num_cols = ['Average of AHT (seconds)', 'Average of Attendance', 'Average of CSAT (%)']
+        selected_feature = st.selectbox("Select feature", num_cols)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.histplot(data=df, x=selected_feature, hue='Risk Indicator', kde=True, palette='viridis', ax=ax)
+        ax.set_title(f'Distribution of {selected_feature} by Risk Indicator', fontsize=14)
+        ax.set_xlabel(selected_feature, fontsize=10)
+        ax.set_ylabel('Count', fontsize=10)
+        st.pyplot(fig)
 
 def data_upload_page():
     st.subheader("Data Upload")
@@ -228,7 +229,15 @@ def model_training_page():
         return
 
     df = st.session_state['df']
-    X, y = preprocess_data(df)
+    
+    # Allow user to select features
+    features = df.columns.tolist()
+    features.remove('Risk Indicator')
+    features.remove('Agent ID')
+    features.remove('Attrition Flag')
+    selected_features = st.multiselect("Select features for training", features, default=features)
+
+    X, y = preprocess_data(df, selected_features)
 
     if X is not None and y is not None:
         if st.button("Train Model"):
