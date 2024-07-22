@@ -22,12 +22,9 @@ def preprocess_data(file_path):
     
     data.fillna(data.mean(), inplace=True)
     
-    # Convert 'Risk Indicator' to categorical
-    data['Risk Indicator'] = data['Risk Indicator'].astype('category')
-    
     # One-hot encode the 'Risk Indicator' column
-    encoder = OneHotEncoder()
-    risk_indicator_encoded = encoder.fit_transform(data[['Risk Indicator']]).toarray()
+    encoder = OneHotEncoder(sparse=False)
+    risk_indicator_encoded = encoder.fit_transform(data[['Risk Indicator']])
     risk_indicator_df = pd.DataFrame(risk_indicator_encoded, columns=encoder.get_feature_names_out(['Risk Indicator']))
     
     # Concatenate the one-hot encoded columns back to the original dataframe
