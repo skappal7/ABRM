@@ -347,10 +347,6 @@ def predictions_page():
                     label="Download predictions as CSV",
                     data=csv,
                     file_name="predictions.csv",
-                    st.download_button(
-                    label="Download predictions as CSV",
-                    data=csv,
-                    file_name="predictions.csv",
                     mime="text/csv",
                 )
 
