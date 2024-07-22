@@ -140,7 +140,7 @@ def visualize_data(df):
 
     for i, (name, value, col) in enumerate(metrics):
         with col:
-            st.markdown(f"<h5 style='text-align: center;'>{name}</h6>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='text-align: center;'>{name}</h5>", unsafe_allow_html=True)
             st.markdown(rounded_rectangle(f"rgba(0, 100, 200, {0.5 + i*0.1})", value), unsafe_allow_html=True)
 
     # Charts
