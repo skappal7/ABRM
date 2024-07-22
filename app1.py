@@ -11,6 +11,9 @@ from sklearn.metrics import accuracy_score, classification_report
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+
 def preprocess_data(file_path):
     data = pd.read_csv(file_path)
     
@@ -20,6 +23,11 @@ def preprocess_data(file_path):
         data[col] = pd.to_numeric(data[col], errors='coerce')
     
     data.fillna(data.mean(), inplace=True)
+    
+    # Handle the incorrectly formatted 'Risk Indicator' column
+    if 'Risk Indicator' in data.columns and isinstance(data['Risk Indicator'].iloc[0], str):
+        risk_indicators = data['Risk Indicator'].iloc[0].replace('[', '').replace(']', '').replace("'", "").split()
+        data['Risk Indicator'] = risk_indicators
     
     # Label encode the 'Risk Indicator' column
     le = LabelEncoder()
