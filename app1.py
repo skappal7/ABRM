@@ -11,9 +11,6 @@ from sklearn.metrics import accuracy_score, classification_report
 FILE_PATH = 'ABRMData.csv'
 MODEL_NAMES = ['Logistic Regression', 'Decision Tree', 'Random Forest', 'Gradient Boosting']
 
-import pandas as pd
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-
 def preprocess_data(file_path):
     data = pd.read_csv(file_path)
     
@@ -114,8 +111,13 @@ def main():
                     joblib.dump(scaler, 'scaler.joblib')
                     joblib.dump(le, 'label_encoder.joblib')
                     st.success("Data prepared successfully.")
+                    st.write(f"Number of features: {X.shape[1]}")
+                    st.write(f"Number of samples: {X.shape[0]}")
+                    st.write(f"Risk categories: {', '.join(le.classes_)}")
                 except Exception as e:
                     st.error(f"Error during data preparation: {e}")
+                    st.write("Error details:")
+                    st.write(pd.read_csv(FILE_PATH).head())  # Display the first few rows of the raw data
 
     elif page == "Model Training":
         st.markdown("""
