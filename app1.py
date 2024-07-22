@@ -34,7 +34,7 @@ def rounded_rectangle(color, value):
         box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
         margin: 10px;
         text-align: center;
-        height: 80px;
+        height: 60px;
         display: flex;
         flex-direction: column;
         justify-content: center;
